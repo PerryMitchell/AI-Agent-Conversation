@@ -15,37 +15,42 @@ anthropic_api_env_var = os.environ.get('ANTHROPIC_API_KEY')
 
 
 class AIAgent:
-    def __init__(self, api_to_use="anthropic", name="Agenty", openai_model="gpt-3.5-turbo", groq_model="llama-3.1-70b-versatile", anthropic_model="claude-3-5-sonnet-latest", ollama_model="llama3", openaiapikey=openai_api_env_var, groqapikey=groq_api_env_var, anthropicapikey=anthropic_api_env_var):
+    def __init__(self, api_to_use="lmstudio", name="Agenty", openai_model="gpt-3.5-turbo", groq_model="llama-3.1-70b-versatile", anthropic_model="claude-3-5-sonnet-latest", ollama_model="llama3", lmstudio_model="huihui-ai_-_llama-3.2-3b-instruct-abliterated", openaiapikey=openai_api_env_var, groqapikey=groq_api_env_var, anthropicapikey=anthropic_api_env_var, lmstudioapikey="lm-studio"):
         self.api_to_use = api_to_use
         self.openai_model = openai_model
         self.anthropic_model = anthropic_model
         self.groq_model = groq_model
         self.ollama_model = ollama_model
+        self.lmstudio_model = lmstudio_model
         self.time_to_sleep_in_between_requests = 0
         self.openaiapikey = openaiapikey
         self.groqapikey = groqapikey
         self.anthropicapikey = anthropicapikey
+        self.lmstudioapikey = lmstudioapikey
         self.responses = []
         self.name = name
         self.model = ""
 
         # Setup for each API
         if api_to_use == "openai":
-            self.time_to_sleep_in_between_requests = 10
             if not openaiapikey:
                 raise ValueError("OpenAI API key is required.")
             self.client = self.init_openai_client(openaiapikey)
 
         if api_to_use == "groq":
-            self.time_to_sleep_in_between_requests = 10
             if not groqapikey:
                 raise ValueError("GROQ API key is required.")
 
         if api_to_use == "anthropic":
-            self.time_to_sleep_in_between_requests = 10
             if not anthropicapikey:
                 raise ValueError("ANTHROPIC API key is required.")
             self.client = self.init_anthropic_client(anthropicapikey)
+        
+        if api_to_use == "lmstudio":
+            if not lmstudioapikey:
+                raise ValueError("LMSTUDIO API key is required.")
+            self.client = self.init_lmstudio_client(api_key=lmstudioapikey)
+
 
     # OpenAI client initialization
     def init_openai_client(self, api_key):
@@ -56,6 +61,11 @@ class AIAgent:
     def init_anthropic_client(self, api_key):
         from anthropic import Anthropic
         self.client = Anthropic(api_key=api_key)
+
+     # LMStudio client initialization
+    def init_lmstudio_client(self, api_key):
+        from openai import OpenAI
+        return OpenAI(base_url="http://localhost:1234/v1", api_key=api_key)
 
     # Query OpenAI API
     def query_openai(self, prompt, max_tokens=4096):
@@ -128,6 +138,18 @@ class AIAgent:
         except json.JSONDecodeError:
             return "Error: Failed to parse the API response as JSON."
     
+    # Query LMStudio API
+    def query_lmstudio(self, prompt, max_tokens=4096):
+        try:
+            response = self.client.chat.completions.create(
+                model=self.openai_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            return f"Error: {str(e)}"
+
     def return_name_api_model(self):
         self.name_api_model = f"{self.name}_{self.api_to_use}_{self.model}"
         return self.name_api_model
@@ -150,6 +172,9 @@ class AIAgent:
         elif self.api_to_use == "ollama":
             self.model = self.ollama_model # To insert model into filename
             return self.query_ollama(prompt)
+        elif self.api_to_use == "lmstudio":
+            self.model = self.lmstudio_model # To insert model into filename
+            return self.query_lmstudio(prompt)
 
     # Agent logic
     def agent(self, instructions, data):
