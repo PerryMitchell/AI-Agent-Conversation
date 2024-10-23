@@ -4,7 +4,6 @@ import requests
 import json
 import os
 import pyttsx3
-from text_to_speech import TextToSpeech
 
 # Change the working directory to this script's location
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -12,17 +11,20 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # Environment Variables
 openai_api_env_var = os.environ.get('OPENAI_API_KEY')
 groq_api_env_var = os.environ.get('GROQ_API_KEY')
+anthropic_api_env_var = os.environ.get('ANTHROPIC_API_KEY')
 
 
 class AIAgent:
-    def __init__(self, api_to_use="openai", name="Agenty", openai_model="gpt-3.5-turbo", groq_model="llama-3.1-70b-versatile", ollama_model="llama3", openaiapikey=openai_api_env_var, groqapikey=groq_api_env_var):
+    def __init__(self, api_to_use="anthropic", name="Agenty", openai_model="gpt-3.5-turbo", groq_model="llama-3.1-70b-versatile", anthropic_model="claude-3-5-sonnet-latest", ollama_model="llama3", openaiapikey=openai_api_env_var, groqapikey=groq_api_env_var, anthropicapikey=anthropic_api_env_var):
         self.api_to_use = api_to_use
         self.openai_model = openai_model
+        self.anthropic_model = anthropic_model
         self.groq_model = groq_model
         self.ollama_model = ollama_model
         self.time_to_sleep_in_between_requests = 0
         self.openaiapikey = openaiapikey
         self.groqapikey = groqapikey
+        self.anthropicapikey = anthropicapikey
         self.responses = []
         self.name = name
         self.model = ""
@@ -34,15 +36,26 @@ class AIAgent:
                 raise ValueError("OpenAI API key is required.")
             self.client = self.init_openai_client(openaiapikey)
 
-        elif api_to_use == "groq":
+        if api_to_use == "groq":
             self.time_to_sleep_in_between_requests = 10
             if not groqapikey:
                 raise ValueError("GROQ API key is required.")
+
+        if api_to_use == "anthropic":
+            self.time_to_sleep_in_between_requests = 10
+            if not anthropicapikey:
+                raise ValueError("ANTHROPIC API key is required.")
+            self.client = self.init_anthropic_client(anthropicapikey)
 
     # OpenAI client initialization
     def init_openai_client(self, api_key):
         from openai import OpenAI
         return OpenAI(api_key=api_key)
+
+    # Anthropic client initialization
+    def init_anthropic_client(self, api_key):
+        from anthropic import Anthropic
+        self.client = Anthropic(api_key=api_key)
 
     # Query OpenAI API
     def query_openai(self, prompt, max_tokens=4096):
@@ -79,6 +92,18 @@ class AIAgent:
             return f"Error: {str(e)}"
         except json.JSONDecodeError:
             return "Error: Failed to parse the API response as JSON."
+
+    # Query Anthropic API
+    def query_anthropic(self, prompt, max_tokens=4096):
+        try:
+            response = self.client.messages.create(
+                model=self.anthropic_model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.content[0].text.strip()
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     # Query Ollama API
     def query_ollama(self, prompt, max_tokens=16000):
@@ -119,6 +144,9 @@ class AIAgent:
         elif self.api_to_use == "groq":
             self.model = self.groq_model # To insert model into filename
             return self.query_groq(prompt)
+        elif self.api_to_use == "anthropic":
+            self.model = self.anthropic_model # To insert model into filename
+            return self.query_groq(prompt)
         elif self.api_to_use == "ollama":
             self.model = self.ollama_model # To insert model into filename
             return self.query_ollama(prompt)
@@ -141,7 +169,7 @@ class AIAgent:
 print("Program started.")
 
 # Choose a topic of conversation here.
-topic = "earths crust displacement theory and any supporting scientific evidence." #input("what would you like to generate a conversation about? ")
+topic = "the younger dryas and the implications for the origin of humanity." #input("what would you like to generate a conversation about? ")
 
 #Choose a filename - todo: should be dynamic hence the extra filename variable.
 filename = topic
@@ -158,7 +186,7 @@ conversation_as_string = f"""{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Su
 
 # Create the conversation.
 # Conversation start.
-agentTwo.agent(f"Your name is {agentTwo.return_name()}. Keep this conversation flowing", agentOne.agent(f"Your name is {agentOne.return_name()} Start this conversation off", f"I would like to have a conversation about {topic}"))
+agentTwo.agent(f"Your name is {agentTwo.return_name()}. Introduce yourself and Keep this conversation flowing", agentOne.agent(f"Your name is {agentOne.return_name()} Introduce yourself and start this conversation off.", f"I would like to have a conversation about {topic}"))
 conversation_as_string = f"""
 
     {conversation_as_string} 
@@ -170,8 +198,8 @@ conversation_as_string = f"""
     """
 #Conversation.
 for i in range(convo_length):
-    agentOne.agent(f"Your name is {agentOne.return_name()}. Introduce yourself and keep this conversation flowing, be an expert in any field associated with the subject matter" , agentTwo.responses[-1]["response"])
-    agentTwo.agent(f"Your name is {agentTwo.return_name()}. Introduce yourself and be less knowledgeable in the subject matter and act as a segway for your conversational partner to speak about the subject in depth. Make sure to ask pertinent questions in order to keep the conversation flowing." , agentOne.responses[-1]["response"])
+    agentOne.agent(f"Keep this conversation flowing, be an expert in any field associated with the subject matter and use expert writing to back that up." , agentTwo.responses[-1]["response"])
+    agentTwo.agent(f"Keep the conversation flowing.Be less knowledgeable in the subject matter and act as a segway for your conversational partner to speak about the subject in depth. Make sure to ask pertinent questions in order to keep the conversation flowing." , agentOne.responses[-1]["response"])
     conversation_as_string = conversation_as_string + f"""
                 
     {agentOne.name}: {agentOne.responses[i]["response"]}
@@ -193,7 +221,6 @@ with open(f"conversations/{filename}_{agentOne.return_name_api_model()}_{agentTw
         
 
 
-print("CONVERSATION: ")
 print(conversation_as_string)
 #TTS-------------------------------------------
 # Initialize the TTS engine
@@ -221,3 +248,5 @@ print(f"{filename}_{agentOne.return_name_api_model()}_{agentTwo.return_name_api_
 
 # Run the speech engine
 engine.runAndWait()
+
+print("Program ended succesfully.")
